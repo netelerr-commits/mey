@@ -175,7 +175,44 @@ export default function DiaCompra() {
     }
 
     try {
+      const { data: listData } = await supabase
+        .from('lists')
+        .select('name')
+        .eq('id', currentListId)
+        .single();
+
+      const totalAmount = purchasedItems.reduce((sum, item) => sum + (item.price || 0), 0);
+
+      const { data: purchaseRecord, error: purchaseError } = await supabase
+        .from('purchases')
+        .insert([
+          {
+            user_id: user?.id,
+            list_id: currentListId,
+            name: listData?.name || 'Compra',
+            total_amount: totalAmount,
+            item_count: purchasedItems.length,
+            purchase_date: new Date().toISOString().split('T')[0]
+          }
+        ])
+        .select()
+        .single();
+
+      if (purchaseError) throw purchaseError;
+
       for (const item of purchasedItems) {
+        await supabase
+          .from('purchase_items')
+          .insert([
+            {
+              purchase_id: purchaseRecord.id,
+              product_id: item.product_id,
+              quantity: item.quantity,
+              price: item.price || 0,
+              category: item.product.category || ''
+            }
+          ]);
+
         const { data: existingPantryItem } = await supabase
           .from('pantry_items')
           .select('id, quantity')
